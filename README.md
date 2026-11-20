@@ -45,7 +45,9 @@ Crie o arquivo com nano docker-compose.yml e cole o conteúdo abaixo.
 
 ⚠️ Atenção aos comentários: Você precisará preencher as API Keys do Unpackerr e o token do Cloudflare posteriormente.
 
-yaml
+
+yaml docker do lab copiar
+
 x-common-keys: &common-keys
     restart: unless-stopped
     logging:
@@ -234,6 +236,8 @@ services:
 networks:
   default:
     name: arr_network
+
+
 3. Configuração do Cloudflare Tunnel
 O Cloudflare Tunnel permite acessar seus serviços de fora de casa sem abrir portas no roteador.
 
