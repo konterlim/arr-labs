@@ -1,4 +1,4 @@
-[manual_completo_de_instala_o_arr_stack.md](https://github.com/user-attachments/files/35166571/manual_completo_de_instala_o_arr_stack.md)
+
 🏗️ Manual Completo de Instalação: ARR Stack + Cloudflare + Extras
 Este guia documenta a instalação do zero do seu servidor de mídia. Ele une o tutorial original da Automation Avenue com as modificações críticas que fizemos para resolver erros de permissão, adicionar a Cloudflare, o Seerr, Unpackerr e Watchtower.
 
