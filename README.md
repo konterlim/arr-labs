@@ -1,3 +1,5 @@
+# 🏗️ Documentação: ARR Stack Completo + Cloudflare Tunnel
+
 Este documento detalha a instalação, configuração e integração de um servidor de mídia automatizado (ARR Stack) baseado no tutorial da Automation Avenue, mas com **melhorias críticas de segurança, acesso externo via Cloudflare e novos aplicativos (Seerr, Unpackerr, Watchtower)**.
 
 Ele foi escrito com base em testes reais, documentando os erros encontrados e as soluções definitivas para cada um.
@@ -38,7 +40,200 @@ sudo chmod -R a=,a+rX,u+w,g+w /data
 # 6. Criar a pasta do projeto e entrar nela
 mkdir -p ~/arr-lab
 cd ~/arr-lab
+2. O Arquivo docker-compose.yml Definitivo
+Crie o arquivo com nano docker-compose.yml e cole o conteúdo abaixo.
 
+⚠️ Atenção aos comentários: Você precisará preencher as API Keys do Unpackerr e o token do Cloudflare posteriormente.
+
+yaml
+x-common-keys: &common-keys
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: America/Sao_Paulo
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+
+services:
+  # --- GERENCIADORES (*ARR) ---
+  radarr:
+    <<: *common-keys
+    container_name: radarr
+    image: ghcr.io/hotio/radarr:latest
+    ports: ["7878:7878"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/radarr:/config
+      - /data:/data
+
+  sonarr:
+    <<: *common-keys
+    container_name: sonarr
+    image: ghcr.io/hotio/sonarr:latest
+    ports: ["8989:8989"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/sonarr:/config
+      - /data:/data
+
+  lidarr:
+    <<: *common-keys
+    container_name: lidarr
+    image: ghcr.io/hotio/lidarr:latest
+    ports: ["8686:8686"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/lidarr:/config
+      - /data:/data
+
+  bazarr:
+    <<: *common-keys
+    container_name: bazarr
+    image: ghcr.io/hotio/bazarr:latest
+    ports: ["6767:6767"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/bazarr:/config
+      - /data/media:/data/media
+
+  prowlarr:
+    <<: *common-keys
+    container_name: prowlarr
+    image: ghcr.io/hotio/prowlarr:latest
+    ports: ["9696:9696"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/prowlarr:/config
+
+  # --- DOWNLOAD E EXTRAÇÃO ---
+  qbittorrent:
+    <<: *common-keys
+    container_name: qbittorrent
+    image: ghcr.io/hotio/qbittorrent:latest
+    ports:
+      - 8080:8080
+      - 6881:6881
+      - 6881:6881/udp
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/qbittorrent:/config
+      - /data:/data
+
+  unpackerr:
+    <<: *common-keys
+    container_name: unpackerr
+    image: golift/unpackerr:latest
+    volumes:
+      - /data:/data
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - UN_LOG_FILE=/data/unpackerr.log
+      - UN_SONARR_0_URL=http://sonarr:8989
+      - UN_SONARR_0_API_KEY=PREENCHER_CHAVE_AQUI
+      - UN_RADARR_0_URL=http://radarr:7878
+      - UN_RADARR_0_API_KEY=PREENCHER_CHAVE_AQUI
+
+  # --- MÍDIA E FRONTEND ---
+  jellyfin:
+    <<: *common-keys
+    container_name: jellyfin
+    image: ghcr.io/hotio/jellyfin:latest
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /docker/appdata/jellyfin:/config
+      - /data/media:/data/media:ro
+    ports: ["8096:8096"]
+    # devices:
+    #   - /dev/dri:/dev/dri  # Descomente para aceleração de hardware
+
+  jellyseerr: # Seerr (antigo Jellyseerr)
+    container_name: jellyseerr
+    image: ghcr.io/seerr-team/seerr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    ports: ["5055:5055"]
+    volumes:
+      - /docker/appdata/jellyseerr:/app/config
+    environment:
+      - TZ=America/Sao_Paulo
+      - LOG_LEVEL=info
+    # Nota: O Seerr novo roda rootless (UID 1000 interno), não aceita PUID/PGID.
+
+  heimdall:
+    <<: *common-keys
+    container_name: heimdall
+    image: lscr.io/linuxserver/heimdall:latest
+    ports:
+      - 8085:80
+      - 8443:443
+    volumes:
+      - /docker/appdata/heimdall:/config
+
+  # --- UTILITÁRIOS ---
+  flaresolverr:
+    <<: *common-keys
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    ports: ["8191:8191"]
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - LOG_LEVEL=info
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=America/Sao_Paulo
+      - WATCHTOWER_SCHEDULE=0 0 17 * * MON # Roda toda segunda às 17h
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_TIMEOUT=90s
+
+  # --- TÚNEL CLOUDFLARE ---
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-lab
+    restart: always
+    command: tunnel --no-autoupdate run --token SUBSTITUA_PELO_TOKEN_DO_SEU_TUNEL
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+    depends_on:
+      - jellyfin
+      - radarr
+      - sonarr
+      - jellyseerr
+
+networks:
+  default:
+    name: arr_network
 3. Configuração do Cloudflare Tunnel
 O Cloudflare Tunnel permite acessar seus serviços de fora de casa sem abrir portas no roteador.
 
